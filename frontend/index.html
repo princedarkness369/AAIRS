@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AAIRS — نظام استرجاع المعلومات من المحتوى الصوتي العربي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@400..700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <div class="grain"></div>
+
+  <header class="topbar">
+    <div class="topbar__mark">
+      <span class="mark-bars" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </span>
+      <span class="mark-text">AAIRS</span>
+    </div>
+    <nav class="topbar__nav">
+      <a href="#search">البحث</a>
+      <a href="#pipeline">المسار التقني</a>
+      <a href="#index">الفهرس المعكوس</a>
+      <a href="#evaluate">التقييم</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ============ HERO / SEARCH ============ -->
+    <section class="hero" id="search">
+      <p class="eyebrow">نظام استرجاع معلومات · محتوى صوتي عربي</p>
+      <h1 class="hero__title">
+        حوّل الصوت العربي إلى
+        <span class="hero__title-accent">معنى قابل للبحث</span>
+      </h1>
+      <p class="hero__subtitle">
+        خمسون تسجيلًا صوتيًا بالعربية الفصحى، مفهرسة عبر Inverted Index وممثَّلة بـ TF-IDF،
+        يتم استرجاعها وترتيبها بحساب التشابه الجيبي (Cosine Similarity) لكل استعلام نصي.
+      </p>
+
+      <div class="waveform" id="waveform" aria-hidden="true"></div>
+
+      <div class="search-box-container">
+        <input type="text" id="searchInput" placeholder="اكتب استعلامك أو سجّل بصوتك...">
+        <button id="searchBtn" class="btn-primary">ابحث</button>
+        <button id="recordBtn" class="btn-record">🎙️ تسجيل صوتي</button>
+        <input type="file" id="audioUpload" accept="audio/*" style="display: none;">
+        <button id="uploadBtn" class="btn-secondary">📁 رفع ملف</button>
+      </div>
+
+      <!-- بطاقة مقاييس التقييم المباشرة -->
+      <div id="metricsBox" class="metrics-grid" style="display: none;">
+        <div class="metric-card">
+          <span class="label">النص المفرغ:</span>
+          <strong id="transcribedText">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="label">التصنيف المكتشف:</span>
+          <strong id="predictedCat">-</strong>
+        </div>
+        <div class="metric-card">
+          <span class="label">Precision:</span>
+          <strong id="precisionVal">0.00</strong>
+        </div>
+        <div class="metric-card">
+          <span class="label">Recall:</span>
+          <strong id="recallVal">0.00</strong>
+        </div>
+        <div class="metric-card">
+          <span class="label">F1-Score:</span>
+          <strong id="f1Val">0.00</strong>
+        </div>
+      </div>
+
+      <p class="demo-flag" id="demo-flag" hidden>
+        وضع العرض التجريبي: النتائج مبنية على بيانات محلية مؤقتة إلى حين ربط الموقع بنموذجك عبر
+        <code>API_BASE_URL</code> في ملف <code>js/main.js</code>.
+      </p>
+
+      <div class="hero__stats" id="corpus-stats">
+        <div class="stat"><span class="stat__num" data-stat="total_documents">—</span><span class="stat__label">مستند
+            صوتي</span></div>
+        <div class="stat"><span class="stat__num" data-stat="vocabulary_size">—</span><span class="stat__label">مصطلح في
+            الفهرس</span></div>
+        <div class="stat"><span class="stat__num">5</span><span class="stat__label">تصنيفات</span></div>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS ============ -->
+    <section class="results-section" id="results-section" hidden>
+      <div class="results-section__head">
+        <h2 id="results-heading">النتائج</h2>
+        <p id="results-meta" class="results-meta"></p>
+      </div>
+      <div id="results-list" class="results-list"></div>
+      <p id="empty-state" class="empty-state" hidden>
+        لا توجد مستندات ذات صلة كافية بهذا الاستعلام. جرّب مصطلحات أخرى من التصنيفات الخمسة.
+      </p>
+    </section>
+
+    <!-- ============ PIPELINE ============ -->
+    <section class="pipeline" id="pipeline">
+      <p class="eyebrow">المسار التقني الكامل</p>
+      <h2 class="section-title">من الموجة الصوتية إلى الترتيب النهائي</h2>
+      <ol class="pipeline__steps">
+        <li><span class="pipeline__num">01</span><span class="pipeline__label">تحويل الصوت إلى نص</span><span
+            class="pipeline__note">Speech-to-Text</span></li>
+        <li><span class="pipeline__num">02</span><span class="pipeline__label">تطبيع النص وإزالة كلمات الوقف</span><span
+            class="pipeline__note">Preprocessing</span></li>
+        <li><span class="pipeline__num">03</span><span class="pipeline__label">بناء الفهرس المعكوس</span><span
+            class="pipeline__note">Inverted Index</span></li>
+        <li><span class="pipeline__num">04</span><span class="pipeline__label">تمثيل المستندات رقميًا</span><span
+            class="pipeline__note">TF-IDF</span></li>
+        <li><span class="pipeline__num">05</span><span class="pipeline__label">معالجة الاستعلام</span><span
+            class="pipeline__note">Query Vector</span></li>
+        <li><span class="pipeline__num">06</span><span class="pipeline__label">حساب التشابه الجيبي</span><span
+            class="pipeline__note">Cosine Similarity</span></li>
+        <li><span class="pipeline__num">07</span><span class="pipeline__label">الترتيب والاسترجاع</span><span
+            class="pipeline__note">Ranking</span></li>
+      </ol>
+    </section>
+
+    <!-- ============ INVERTED INDEX PREVIEW ============ -->
+    <section class="index-preview" id="index">
+      <p class="eyebrow">Phase 4</p>
+      <h2 class="section-title">لمحة من الفهرس المعكوس</h2>
+      <p class="section-sub">أكثر المصطلحات ارتباطًا بعدد من المستندات في المجموعة الحالية.</p>
+      <div id="index-table" class="index-table"></div>
+    </section>
+
+    <!-- ============ EVALUATION ============ -->
+    <section class="evaluate" id="evaluate">
+      <p class="eyebrow">Phase 9</p>
+      <h2 class="section-title">تقييم أداء الاسترجاع</h2>
+      <p class="section-sub">اختر استعلامًا وتصنيفه الحقيقي لحساب الدقة والاسترجاع ومقياس F1 تلقائيًا.</p>
+
+      <form class="evaluate__form" id="evaluate-form">
+        <input type="text" id="eval-query" class="evaluate__input" placeholder="نص الاستعلام" />
+        <select id="eval-category" class="evaluate__select">
+          <option value="AI">الذكاء الاصطناعي</option>
+          <option value="IR">استرجاع المعلومات</option>
+          <option value="HEALTHY">الصحة</option>
+          <option value="EDU">التعليم</option>
+          <option value="SPORT">الرياضة</option>
+        </select>
+        <button type="submit" class="evaluate__button">احسب المقاييس</button>
+      </form>
+
+      <div id="metrics" class="metrics" hidden>
+        <div class="metric"><span class="metric__value" id="metric-precision">—</span><span
+            class="metric__label">Precision</span></div>
+        <div class="metric"><span class="metric__value" id="metric-recall">—</span><span
+            class="metric__label">Recall</span></div>
+        <div class="metric"><span class="metric__value" id="metric-f1">—</span><span
+            class="metric__label">F1-score</span></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>AAIRS — Arabic Audio Information Retrieval System · مشروع أكاديمي في استرجاع المعلومات</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+
+</html>
