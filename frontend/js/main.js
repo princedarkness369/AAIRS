@@ -31,8 +31,8 @@
    Demo mode is not meant to replace your actual IR pipeline.
    ========================================================================== */
 
-const API_BASE_URL = "https://prince369darkness-ir-arabic.hf.space/api";
-const AUDIO_BASE_PATH = "audio/"; // folder containing the wav files
+const API_BASE_URL = "http://127.0.0.1:8000/api";
+const AUDIO_BASE_PATH = "audio/"; // folder containing the mp3 files, used in demo mode
 
 const CATEGORY_LABELS = {
   AI: "الذكاء الاصطناعي",
@@ -358,174 +358,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("تعذر تحميل عينة الفهرس المعكوس:", e);
   }
 
-  // -------------------------------------------------------------------------
-  // Search Execution Helper
-  // -------------------------------------------------------------------------
-  async function performSearch(query) {
+  document.getElementById("search-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const query = document.getElementById("query-input").value.trim();
     if (!query) return;
     try {
       const results = await apiSearch(query, 10);
       renderResults(query, results);
-      document.getElementById("results-section").hidden = false;
       document.getElementById("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
-      console.error("خطأ في البحث:", e);
+      console.error(e);
       renderResults(query, []);
     }
-  }
+  });
 
-  // Text search input and button
-  const searchInput = document.getElementById("searchInput") || document.getElementById("query-input");
-  const searchBtn = document.getElementById("searchBtn");
-  const searchForm = document.getElementById("search-form");
-
-  if (searchBtn && searchInput) {
-    searchBtn.addEventListener("click", () => {
-      performSearch(searchInput.value.trim());
-    });
-    searchInput.addEventListener("keypress", (ev) => {
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        performSearch(searchInput.value.trim());
-      }
-    });
-  }
-
-  if (searchForm) {
-    searchForm.addEventListener("submit", (ev) => {
-      ev.preventDefault();
-      const val = searchInput ? searchInput.value.trim() : "";
-      performSearch(val);
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // Audio Upload & Voice Recording -> /api/process-audio
-  // -------------------------------------------------------------------------
-  async function sendAudioToBackend(audioBlob, filename = "recording.wav") {
-    if (!API_BASE_URL) {
-      alert("الباك إند غير متصل حالياً.");
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", audioBlob, filename);
-
-    const statusEl = document.getElementById("transcribedText");
-    if (statusEl) statusEl.textContent = "جاري المعالجة وتحويل الصوت بنموذج Whisper...";
-    const metricsBox = document.getElementById("metricsBox");
-    if (metricsBox) metricsBox.style.display = "grid";
-
+  document.getElementById("evaluate-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const query = document.getElementById("eval-query").value.trim();
+    const category = document.getElementById("eval-category").value;
+    if (!query) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/process-audio`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (data.error) {
-        alert(data.error);
-        return;
-      }
-
-      // عرض النتائج والمقاييس المفرغة
-      if (document.getElementById("transcribedText")) {
-        document.getElementById("transcribedText").textContent = data.transcribed_text || "—";
-      }
-      if (document.getElementById("predictedCat")) {
-        document.getElementById("predictedCat").textContent = data.predicted_category || "—";
-      }
-      if (data.metrics) {
-        if (document.getElementById("precisionVal")) document.getElementById("precisionVal").textContent = data.metrics.precision ?? "0.00";
-        if (document.getElementById("recallVal")) document.getElementById("recallVal").textContent = data.metrics.recall ?? "0.00";
-        if (document.getElementById("f1Val")) document.getElementById("f1Val").textContent = data.metrics.f1_score ?? "0.00";
-      }
-
-      if (searchInput && data.transcribed_text) {
-        searchInput.value = data.transcribed_text;
-      }
-
-      const formattedResults = (data.results || []).map((r) => ({
-        doc_id: r.doc_id,
-        category: r.category,
-        category_ar: CATEGORY_LABELS[r.category] || r.category,
-        similarity: r.similarity || 0,
-        transcript: r.text || r.transcript || "",
-        audio_file: r.audio_file
-      }));
-
-      renderResults(data.transcribed_text || "تسجيل صوتي", formattedResults);
-      document.getElementById("results-section").hidden = false;
-      document.getElementById("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (err) {
-      console.error("خطأ في معالجة الصوت:", err);
-      alert("تعذر الاتصال بالباك إند لمعالجة الصوت.");
+      const metrics = await apiEvaluate(query, category);
+      renderMetrics(metrics);
+    } catch (e) {
+      console.error(e);
     }
-  }
-
-  // Upload file button
-  const uploadBtn = document.getElementById("uploadBtn");
-  const audioUpload = document.getElementById("audioUpload");
-  if (uploadBtn && audioUpload) {
-    uploadBtn.addEventListener("click", () => audioUpload.click());
-    audioUpload.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        sendAudioToBackend(file, file.name);
-      }
-    });
-  }
-
-  // Microphone recording
-  const recordBtn = document.getElementById("recordBtn");
-  let mediaRecorder = null;
-  let audioChunks = [];
-  let isRecording = false;
-
-  if (recordBtn) {
-    recordBtn.addEventListener("click", async () => {
-      if (!isRecording) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream);
-          audioChunks = [];
-          mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-          mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-            sendAudioToBackend(audioBlob, "user_voice.wav");
-          };
-          mediaRecorder.start();
-          isRecording = true;
-          recordBtn.textContent = "⏹️ إيقاف التسجيل...";
-          recordBtn.style.background = "#dc2626";
-        } catch (e) {
-          alert("تعذر الوصول إلى الميكروفون: " + e.message);
-        }
-      } else {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-        }
-        isRecording = false;
-        recordBtn.textContent = "🎙️ تسجيل صوتي";
-        recordBtn.style.background = "";
-      }
-    });
-  }
-
-  // Evaluation Form
-  const evalForm = document.getElementById("evaluate-form");
-  if (evalForm) {
-    evalForm.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const query = document.getElementById("eval-query").value.trim();
-      const category = document.getElementById("eval-category").value;
-      if (!query) return;
-      try {
-        const metrics = await apiEvaluate(query, category);
-        renderMetrics(metrics);
-      } catch (e) {
-        console.error(e);
-      }
-    });
-  }
+  });
 });
-
