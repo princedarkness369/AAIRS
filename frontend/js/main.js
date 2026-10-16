@@ -358,30 +358,181 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("تعذر تحميل عينة الفهرس المعكوس:", e);
   }
 
-  document.getElementById("search-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const query = document.getElementById("query-input").value.trim();
-    if (!query) return;
-    try {
-      const results = await apiSearch(query, 10);
-      renderResults(query, results);
-      document.getElementById("results-section").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) {
-      console.error(e);
-      renderResults(query, []);
-    }
-  });
+  // -------------------------------------------------------------------------
+  // Search Action
+  // -------------------------------------------------------------------------
+  const searchInput = document.getElementById("searchInput") || document.getElementById("query-input");
+  const searchBtn = document.getElementById("searchBtn");
 
-  document.getElementById("evaluate-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const query = document.getElementById("eval-query").value.trim();
-    const category = document.getElementById("eval-category").value;
-    if (!query) return;
+  async function performSearch(query) {
+    const q = (query || (searchInput ? searchInput.value : "")).trim();
+    if (!q) return;
     try {
-      const metrics = await apiEvaluate(query, category);
-      renderMetrics(metrics);
+      const results = await apiSearch(q, 10);
+      renderResults(q, results);
+      const resultsSection = document.getElementById("results-section");
+      if (resultsSection) {
+        resultsSection.hidden = false;
+        resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     } catch (e) {
-      console.error(e);
+      console.error("Search error:", e);
+      renderResults(q, []);
     }
-  });
+  }
+
+  if (searchBtn) {
+    searchBtn.addEventListener("click", () => performSearch());
+  }
+  if (searchInput) {
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") performSearch();
+    });
+  }
+
+  const searchForm = document.getElementById("search-form");
+  if (searchForm) {
+    searchForm.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      performSearch();
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Audio Upload & Processing
+  // -------------------------------------------------------------------------
+  const uploadBtn = document.getElementById("uploadBtn");
+  const audioUpload = document.getElementById("audioUpload");
+
+  if (uploadBtn && audioUpload) {
+    uploadBtn.addEventListener("click", () => audioUpload.click());
+
+    audioUpload.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      await uploadAndProcessAudio(file);
+    });
+  }
+
+  async function uploadAndProcessAudio(file) {
+    const metricsBox = document.getElementById("metricsBox");
+    const transcribedText = document.getElementById("transcribedText");
+    const predictedCat = document.getElementById("predictedCat");
+    const precisionVal = document.getElementById("precisionVal");
+    const recallVal = document.getElementById("recallVal");
+    const f1Val = document.getElementById("f1Val");
+
+    if (transcribedText) transcribedText.textContent = "جاري التحليل عبر Whisper...";
+    if (metricsBox) metricsBox.style.display = "grid";
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/process-audio`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("تعذر معالجة الملف الصوتي من الخادم");
+      const data = await res.json();
+
+      if (data.transcribed_text && searchInput) {
+        searchInput.value = data.transcribed_text;
+      }
+      if (transcribedText) transcribedText.textContent = data.transcribed_text || "—";
+      if (predictedCat) predictedCat.textContent = data.predicted_category || "—";
+      if (data.metrics) {
+        if (precisionVal) precisionVal.textContent = (data.metrics.precision ?? 0).toFixed(2);
+        if (recallVal) recallVal.textContent = (data.metrics.recall ?? 0).toFixed(2);
+        if (f1Val) f1Val.textContent = (data.metrics.f1_score ?? 0).toFixed(2);
+      }
+
+      const results = (data.results || []).map((r) => ({
+        doc_id: r.doc_id,
+        category: r.category,
+        category_ar: CATEGORY_LABELS[r.category] || r.category,
+        similarity: r.similarity || 0,
+        transcript: r.text || r.transcript,
+        audio_file: r.audio_file,
+      }));
+
+      renderResults(data.transcribed_text || "استعلام صوتي", results);
+      const resultsSection = document.getElementById("results-section");
+      if (resultsSection) {
+        resultsSection.hidden = false;
+        resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } catch (err) {
+      console.error(err);
+      if (transcribedText) transcribedText.textContent = "حدث خطأ أثناء معالجة الصوت: " + err.message;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Microphone Recording
+  // -------------------------------------------------------------------------
+  const recordBtn = document.getElementById("recordBtn");
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isRecording = false;
+
+  if (recordBtn) {
+    recordBtn.addEventListener("click", async () => {
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+          };
+
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            const audioFile = new File([audioBlob], "recorded_query.wav", { type: "audio/wav" });
+            stream.getTracks().forEach((track) => track.stop());
+            await uploadAndProcessAudio(audioFile);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          recordBtn.classList.add("recording");
+          recordBtn.textContent = "⏹️ إيقاف التسجيل...";
+        } catch (err) {
+          console.error("Microphone access error:", err);
+          alert("تعذر الوصول إلى الميكروفون: " + err.message);
+        }
+      } else {
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+        isRecording = false;
+        recordBtn.classList.remove("recording");
+        recordBtn.textContent = "🎙️ تسجيل صوتي";
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Evaluation Form
+  // -------------------------------------------------------------------------
+  const evalForm = document.getElementById("evaluate-form");
+  if (evalForm) {
+    evalForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const evalInput = document.getElementById("eval-query");
+      const evalCat = document.getElementById("eval-category");
+      const query = evalInput ? evalInput.value.trim() : "";
+      const category = evalCat ? evalCat.value : "AI";
+      if (!query) return;
+      try {
+        const metrics = await apiEvaluate(query, category);
+        renderMetrics(metrics);
+      } catch (e) {
+        console.error("Evaluation error:", e);
+      }
+    });
+  }
 });
