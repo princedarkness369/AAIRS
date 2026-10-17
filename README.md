@@ -92,6 +92,14 @@ The dataset includes Arabic audio recordings categorized into:
 - **EDU (التعليم):** Educational methodologies and e-learning.
 - **SPORT (الرياضة واللياقة):** Exercise, physical training, and fitness.
 
+## 📬 Contact
+
+**NAME**
+
+*   LinkedIn: https://www.linkedin.com/in/shahd-al-rabaya-58b8882b1/
+*   GitHub: https://github.com/princedarkness369/
+*   Email: Shahdfalrabaya@gmail.com
+
 ---
 
 ## 📄 License
